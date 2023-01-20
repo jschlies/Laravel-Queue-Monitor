@@ -229,6 +229,8 @@
 
                                 <form action="{{ route('queue-monitor::destroy', [$job]) }}" method="post">
 
+                                    <input type="hidden" name="type" value="{{isset($filters['type']) ? $filters['type'] : ''}}">
+                                    <input type="hidden" name="queue" value="{{isset($filters['queue']) ? $filters['queue'] : ''}}">
                                     @csrf
                                     @method('delete')
 
