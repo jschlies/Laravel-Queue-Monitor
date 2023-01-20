@@ -19,12 +19,25 @@ class ShowQueueMonitorController
      *
      * @return \Illuminate\Contracts\Foundation\Application|\Illuminate\Contracts\View\Factory|\Illuminate\Contracts\View\View
      */
-    public function __invoke(Request $request)
+    public function __invoke(Request $request, $type=null, $queue=null)
     {
         $data = $request->validate([
             'type' => ['nullable', 'string', Rule::in(['all', 'running', 'failed', 'succeeded'])],
             'queue' => ['nullable', 'string'],
         ]);
+
+        if((! isset($data['type'])) && $type)
+        {
+            $data['type'] = $type;
+        }
+        if((! isset($data['type']) ) && $queue)
+        {
+            $data['queue'] = $queue;
+        }
+        $filters = [
+            'type' => $data['type'] ?? 'all',
+            'queue' => $data['queue'] ?? 'all',
+        ];
 
         $filters = [
             'type' => $data['type'] ?? 'all',
