@@ -14,7 +14,7 @@ class DeleteMonitorController
         $data = $request->all();
 
         return redirect()->route(
-            'queue-monitor::index_filtered',
+            'queue-monitor::index',
             [
                 'type'  => isset($data['type']) ? $data['type'] : 'all',
                 'queue' => isset($data['queue']) ? $data['queue'] : 'all',
