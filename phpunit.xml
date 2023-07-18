@@ -10,7 +10,7 @@
     convertNoticesToExceptions="true"
     convertWarningsToExceptions="true"
     processIsolation="false"
-    stopOnFailure="false"
+    stopOnFailure="true"
     xsi:noNamespaceSchemaLocation="https://schema.phpunit.de/9.3/phpunit.xsd"
 >
     <coverage processUncoveredFiles="true">
@@ -24,9 +24,13 @@
         </testsuite>
     </testsuites>
     <php>
-        <server name="APP_ENV" value="testing" />
-        <server name="DB_CONNECTION" value="sqlite"/>
-        <server name="DB_DATABASE" value=":memory:"/>
+        <server name="APP_ENV" value="testing"/>
+        <env name="DB_CONNECTION" value=""/>
+        <env name="DB_HOST" value="database"/>
+        <env name="DB_PORT" value="3306"/>
+        <env name="DB_USERNAME" value=""/>
+        <env name="DB_PASSWORD" value=""/>
+        <env name="DB_DATABASE" value="web"/>
         <server name="BCRYPT_ROUNDS" value="4"/>
         <server name="CACHE_DRIVER" value="array"/>
         <server name="QUEUE_CONNECTION" value="database"/>

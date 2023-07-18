@@ -3,12 +3,13 @@
 namespace romanzipp\QueueMonitor\Controllers;
 
 use Carbon\Carbon;
-use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database as DatabaseConnections;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use romanzipp\QueueMonitor\Controllers\Payloads\Metric;
 use romanzipp\QueueMonitor\Controllers\Payloads\Metrics;
+use romanzipp\QueueMonitor\Enums\MonitorStatus;
 use romanzipp\QueueMonitor\Models\Contracts\MonitorContract;
 use romanzipp\QueueMonitor\Services\QueueMonitor;
 
@@ -22,8 +23,9 @@ class ShowQueueMonitorController
     public function __invoke(Request $request, $type=null, $queue=null)
     {
         $data = $request->validate([
-            'type' => ['nullable', 'string', Rule::in(['all', 'running', 'failed', 'succeeded'])],
+            'status' => ['nullable', 'numeric', Rule::in(MonitorStatus::toArray())],
             'queue' => ['nullable', 'string'],
+            'name' => ['nullable', 'string'],
         ]);
 
         if((! isset($data['type'])) && $type)
@@ -40,34 +42,31 @@ class ShowQueueMonitorController
         ];
 
         $filters = [
-            'type' => $data['type'] ?? 'all',
+            'status' => isset($data['status']) ? (int) $data['status'] : null,
             'queue' => $data['queue'] ?? 'all',
+            'name' => $data['name'] ?? null,
         ];
 
-        $jobs = QueueMonitor::getModel()
-            ->newQuery()
-            ->when(($type = $filters['type']) && 'all' !== $type, static function (Builder $builder) use ($type) {
-                switch ($type) {
-                    case 'running':
-                        $builder->whereNull('finished_at');
-                        break;
+        $jobsQuery = QueueMonitor::getModel()->newQuery();
 
-                    case 'failed':
-                        $builder->where('failed', 1)->whereNotNull('finished_at');
-                        break;
+        if (null !== $filters['status']) {
+            $jobsQuery->where('status', $filters['status']);
+        }
 
-                    case 'succeeded':
-                        $builder->where('failed', 0)->whereNotNull('finished_at');
-                        break;
-                }
-            })
-            ->when(($queue = $filters['queue']) && 'all' !== $queue, static function (Builder $builder) use ($queue) {
-                $builder->where('queue', $queue);
-            })
-            ->ordered()
-            ->paginate(
-                config('queue-monitor.ui.per_page')
-            )
+        if ('all' !== $filters['queue']) {
+            $jobsQuery->where('queue', $filters['queue']);
+        }
+
+        if (null !== $filters['name']) {
+            $jobsQuery->where('name', 'like', "%{$filters['name']}%");
+        }
+
+        $jobsQuery
+            ->orderBy('started_at', 'desc')
+            ->orderBy('started_at_exact', 'desc');
+
+        $jobs = $jobsQuery
+            ->paginate(config('queue-monitor.ui.per_page'))
             ->appends(
                 $request->all()
             );
@@ -93,6 +92,7 @@ class ShowQueueMonitorController
             'filters' => $filters,
             'queues' => $queues,
             'metrics' => $metrics,
+            'statuses' => MonitorStatus::toNamedArray(),
         ]);
     }
 
@@ -102,21 +102,43 @@ class ShowQueueMonitorController
 
         $metrics = new Metrics();
 
+        $connection = DB::connection();
+
+        $expressionTotalTime = DB::raw('SUM(TIMESTAMPDIFF(SECOND, `started_at`, `finished_at`)) as `total_time_elapsed`');
+        $expressionAverageTime = DB::raw('AVG(TIMESTAMPDIFF(SECOND, `started_at`, `finished_at`)) as `average_time_elapsed`');
+
+        if ($connection instanceof DatabaseConnections\SQLiteConnection) {
+            $expressionTotalTime = DB::raw('SUM(DATEDIFF(SECOND, `started_at`, `finished_at`)) as total_time_elapsed');
+            $expressionAverageTime = DB::raw('AVG(DATEDIFF(SECOND, `started_at`, `finished_at`)) as average_time_elapsed');
+        }
+
+        if ($connection instanceof DatabaseConnections\SqlServerConnection) {
+            $expressionTotalTime = DB::raw('SUM(DATEDIFF(SECOND, `started_at`, `finished_at`)) as `total_time_elapsed`');
+            $expressionAverageTime = DB::raw('AVG(DATEDIFF(SECOND, `started_at`, `finished_at`)) as `average_time_elapsed`');
+        }
+
+        if ($connection instanceof DatabaseConnections\PostgresConnection) {
+            $expressionTotalTime = DB::raw('SUM(EXTRACT(EPOCH FROM (finished_at - started_at))) as total_time_elapsed');
+            $expressionAverageTime = DB::raw('AVG(EXTRACT(EPOCH FROM (finished_at - started_at))) as average_time_elapsed');
+        }
+
         $aggregationColumns = [
             DB::raw('COUNT(*) as count'),
-            DB::raw('SUM(time_elapsed) as total_time_elapsed'),
-            DB::raw('AVG(time_elapsed) as average_time_elapsed'),
+            $expressionTotalTime,
+            $expressionAverageTime,
         ];
 
         $aggregatedInfo = QueueMonitor::getModel()
             ->newQuery()
             ->select($aggregationColumns)
+            ->where('status', '!=', MonitorStatus::RUNNING)
             ->where('started_at', '>=', Carbon::now()->subDays($timeFrame))
             ->first();
 
         $aggregatedComparisonInfo = QueueMonitor::getModel()
             ->newQuery()
             ->select($aggregationColumns)
+            ->where('status', '!=', MonitorStatus::RUNNING)
             ->where('started_at', '>=', Carbon::now()->subDays($timeFrame * 2))
             ->where('started_at', '<=', Carbon::now()->subDays($timeFrame))
             ->first();

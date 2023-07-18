@@ -3,7 +3,7 @@
 [![Latest Stable Version](https://img.shields.io/packagist/v/romanzipp/laravel-queue-monitor.svg?style=flat-square)](https://packagist.org/packages/romanzipp/laravel-queue-monitor)
 [![Total Downloads](https://img.shields.io/packagist/dt/romanzipp/laravel-queue-monitor.svg?style=flat-square)](https://packagist.org/packages/romanzipp/laravel-queue-monitor)
 [![License](https://img.shields.io/packagist/l/romanzipp/laravel-queue-monitor.svg?style=flat-square)](https://packagist.org/packages/romanzipp/laravel-queue-monitor)
-[![GitHub Build Status](https://img.shields.io/github/workflow/status/romanzipp/Laravel-Queue-Monitor/Tests?style=flat-square)](https://github.com/romanzipp/Laravel-Queue-Monitor/actions)
+[![GitHub Build Status](https://img.shields.io/github/actions/workflow/status/romanzipp/Laravel-Queue-Monitor/tests.yml?branch=master&label=tests&style=flat-square)](https://github.com/romanzipp/Laravel-Queue-Monitor/actions)
 
 This package offers monitoring like [Laravel Horizon](https://laravel.com/docs/horizon) for database queue.
 
@@ -14,19 +14,24 @@ This package offers monitoring like [Laravel Horizon](https://laravel.com/docs/h
 - Monitor job progress
 - Get an estimated time remaining for a job
 - Store additional data for a job monitoring
+- Retry jobs via the UI
 
 ## Installation
+
+✨ **See [Upgrade Guide](https://github.com/romanzipp/Laravel-Queue-Monitor/releases/tag/4.0.0) if you are updating to 4.0** ✨
 
 ```
 composer require romanzipp/laravel-queue-monitor
 ```
+
+See [romanzipp/Laravel-Queue-Monitor-Nova](https://github.com/romanzipp/Laravel-Queue-Monitor-Nova) for **Laravel Nova** resources & metrics.
 
 ## Configuration
 
 Copy configuration & migration to your project:
 
 ```
-php artisan vendor:publish --provider="romanzipp\QueueMonitor\Providers\QueueMonitorProvider"  --tag=config --tag=migrations
+php artisan vendor:publish --provider="romanzipp\QueueMonitor\Providers\QueueMonitorProvider" --tag=config --tag=migrations
 ```
 
 Migrate the Queue Monitoring table. The table name can be configured in the config file or via the published migration.
@@ -59,28 +64,48 @@ class ExampleJob implements ShouldQueue
 
 **Important!** You need to implement the `Illuminate\Contracts\Queue\ShouldQueue` interface to your job class. Otherwise, Laravel will not dispatch any events containing status information for monitoring the job.
 
-## UI
+## Web Interface
 
-You can enable the optional UI routes by calling `Route::queueMonitor()` inside your route file, similar to the official [ui scaffolding](https://github.com/laravel/ui).
+You can enable the web UI by setting the [`ui.enabled`](config/queue-monitor.php#23) to `true` configuration value.
 
-```php
-Route::prefix('jobs')->group(function () {
-    Route::queueMonitor();
-});
+**Publish frontend assets:**
+
+```sh
+php artisan vendor:publish --provider="romanzipp\QueueMonitor\Providers\QueueMonitorProvider" --tag=assets
 ```
 
-### Routes
+See the [full configuration file](config/queue-monitor.php) for more information.
 
-| Route | Action              |
-| ----- | ------------------- |
-| `/`   | Show the jobs table |
+![Preview](preview.png#gh-light-mode-only)
+![Preview](preview.dark.png#gh-dark-mode-only)
 
-See the [full configuration file](https://github.com/romanzipp/Laravel-Queue-Monitor/blob/master/config/queue-monitor.php) for more information.
+## Commands
 
-![Preview](https://raw.githubusercontent.com/romanzipp/Laravel-Queue-Monitor/master/preview.png)
+### `artisan queue-monitor:stale`
 
+This command mark old monitor entries as `stale`. You should run this command regularly in your console kernel.
 
-## Extended usage
+**Arguments & Options:**
+- `--before={date}` The start date before which all entries will be marked as stale
+- `--beforeDays={days}` The relative amount of days before which entries will be marked as stale
+- `--beforeInterval={interval}` An [interval date string](https://www.php.net/manual/en/dateinterval.createfromdatestring.php) before which entries will be marked as stale
+- `--dry` Dry-run only
+
+### `artisan queue-monitor:purge`
+
+This command deletes old monitor models.
+
+**Arguments & Options:**
+- `--before={date}` The start date before which all entries will be deleted
+- `--beforeDays={days}` The relative amount of days before which entries will be deleted
+- `--beforeInterval={interval}` An [interval date string](https://www.php.net/manual/en/dateinterval.createfromdatestring.php) before which entries will be deleted
+- `--queue={queue}` Only purge certain queues (comma separated values)
+- `--only-succeeded` Only purge succeeded entries
+- `--dry` Dry-run only
+
+Either the **before** or **beforeDate** arguments are required.
+
+## Advanced usage
 
 ### Progress
 
@@ -113,7 +138,7 @@ class ExampleJob implements ShouldQueue
 
 A common scenario for a job is iterating through large collections.
 
-This example job loops through a large amount of users and updates it's progress value with each chunk iteration.
+This example job loops through a large amount of users and updates its progress value with each chunk iteration.
 
 ```php
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -262,9 +287,25 @@ Monitor::today();
 Monitor::today()->failed();
 ```
 
+## Tests
+
+The easiest way to execute tests locally is via [**Lando**](https://lando.dev/). The [Lando config file](.lando.yml) automatically spins up app & database containers.
+
+```shell
+lando start
+
+lando phpunit-mysql
+lando phpunit-postgres
+```
+
 ## Upgrading
 
+- [**Upgrade from 2.0 to 3.0**](https://github.com/romanzipp/Laravel-Queue-Monitor/releases/tag/3.0.0)
 - [Upgrade from 1.0 to 2.0](https://github.com/romanzipp/Laravel-Queue-Monitor/releases/tag/2.0.0)
+
+## License
+
+The MIT License (MIT). Please see [License File](LICENSE.md) for more information.
 
 ----
 
