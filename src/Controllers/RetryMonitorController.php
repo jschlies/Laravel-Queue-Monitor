@@ -12,12 +12,22 @@ class RetryMonitorController
 {
     public function __invoke(Request $request, int $monitorId): RedirectResponse
     {
+//        /** @var \romanzipp\QueueMonitor\Models\Monitor $monitor */
+//        $monitor = Monitor::query()
+//            ->where('status', MonitorStatus::FAILED)
+//            ->where('retried', false)
+//            ->whereNotNull('job_uuid')
+//            ->find($monitorId) ?? throw new ModelNotFoundException();
+
         /** @var \romanzipp\QueueMonitor\Models\Monitor $monitor */
-        $monitor = Monitor::query()
+        if(! $monitor = Monitor::query()
             ->where('status', MonitorStatus::FAILED)
             ->where('retried', false)
             ->whereNotNull('job_uuid')
-            ->find($monitorId) ?? throw new ModelNotFoundException();
+            ->find($monitorId))
+        {
+            throw new ModelNotFoundException();
+        }
 
         if (is_a($monitor, Monitor::class)) {
             $monitor->retry();
