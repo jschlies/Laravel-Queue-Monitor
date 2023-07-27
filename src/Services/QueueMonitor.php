@@ -83,7 +83,7 @@ class QueueMonitor
      *
      * @return string|int
      */
-    public static function getJobId(JobContract $job): string|int
+    public static function getJobId(JobContract $job)
     {
         if ($jobId = $job->getJobId()) {
             return $jobId;
